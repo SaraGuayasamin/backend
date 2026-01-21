@@ -2,14 +2,18 @@ const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const app = express();
-const UPSTREAM = process.env.UPSTREAM || 'http://api-aeis.duckdns.org';
+// CAMBIO IMPORTANTE: Usamos HTTPS por defecto
+const UPSTREAM = process.env.UPSTREAM || 'https://api-aeis.duckdns.org';
 const PORT = process.env.PORT || 3000;
 
 // CORS middleware
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  // Ajuste para permitir credenciales si fuera necesario
+  const origin = req.headers.origin;
+  res.header('Access-Control-Allow-Origin', origin || '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.header('Access-Control-Allow-Credentials', 'true');
   
   // Handle preflight
   if (req.method === 'OPTIONS') {
@@ -25,23 +29,17 @@ app.get('/health', (req, res) => res.json({ status: 'ok', upstream: UPSTREAM }))
 app.use('/', createProxyMiddleware({
   target: UPSTREAM,
   changeOrigin: true,
+  secure: false,          // Acepta certificados auto-firmados si fuera el caso
+  followRedirects: true,  // <--- CRUCIAL: Sigue redirecciones internamente
   proxyTimeout: 30000,
-  onProxyReq: (proxyReq, req, res) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    console.log('Headers:', JSON.stringify(req.headers, null, 2));
-    if (req.body) {
-      console.log('Body:', req.body);
-    }
-  },
-  onProxyRes: (proxyRes, req, res) => {
-    console.log(`[${new Date().toISOString()}] Response: ${proxyRes.statusCode}`);
-    console.log('Response headers:', JSON.stringify(proxyRes.headers, null, 2));
-  },
   onError: (err, req, res) => {
     console.error('Proxy error:', err && err.message);
     if (!res.headersSent) {
       res.status(502).json({ error: 'Bad gateway', details: err.message });
     }
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log(`[Proxy] Proxying ${req.method} request to: ${UPSTREAM}${req.url}`);
   }
 }));
 
