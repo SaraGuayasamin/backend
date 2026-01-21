@@ -26,6 +26,17 @@ app.use('/', createProxyMiddleware({
   target: UPSTREAM,
   changeOrigin: true,
   proxyTimeout: 30000,
+  onProxyReq: (proxyReq, req, res) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    if (req.body) {
+      console.log('Body:', req.body);
+    }
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    console.log(`[${new Date().toISOString()}] Response: ${proxyRes.statusCode}`);
+    console.log('Response headers:', JSON.stringify(proxyRes.headers, null, 2));
+  },
   onError: (err, req, res) => {
     console.error('Proxy error:', err && err.message);
     if (!res.headersSent) {
